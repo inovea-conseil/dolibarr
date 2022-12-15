@@ -474,6 +474,149 @@ class CommandeFournisseur extends CommonOrder
 		}
 	}
 
+
+	/**
+	 *	Get object and lines from database
+	 *
+	 * 	@param	int		$id			Id of supplier to load
+	 *	@return int 		        >0 if OK, <0 if KO, 0 if not found
+	 */
+	public function fetchBySupplier($id,$status=array(self::STATUS_ORDERSENT,self::STATUS_RECEIVED_PARTIALLY))
+	{
+		global $conf;
+
+		// Check parameters
+		if (empty($id)) {
+			return -1;
+		}
+
+		$sql = "SELECT c.rowid, c.entity, c.ref, ref_supplier, c.fk_soc, c.fk_statut, c.amount_ht, c.total_ht, c.total_ttc, c.total_tva,";
+		$sql .= " c.localtax1, c.localtax2, ";
+		$sql .= " c.date_creation, c.date_valid, c.date_approve, c.date_approve2,";
+		$sql .= " c.fk_user_author, c.fk_user_valid, c.fk_user_approve, c.fk_user_approve2,";
+		$sql .= " c.date_commande as date_commande, c.date_livraison as delivery_date, c.fk_cond_reglement, c.fk_mode_reglement, c.fk_projet as fk_project, c.remise_percent, c.source, c.fk_input_method,";
+		$sql .= " c.fk_account,";
+		$sql .= " c.note_private, c.note_public, c.model_pdf, c.extraparams, c.billed,";
+		$sql .= " c.fk_multicurrency, c.multicurrency_code, c.multicurrency_tx, c.multicurrency_total_ht, c.multicurrency_total_tva, c.multicurrency_total_ttc,";
+		$sql .= " cm.libelle as methode_commande,";
+		$sql .= " cr.code as cond_reglement_code, cr.libelle as cond_reglement_label, cr.libelle_facture as cond_reglement_doc,";
+		$sql .= " p.code as mode_reglement_code, p.libelle as mode_reglement_libelle";
+		$sql .= ', c.fk_incoterms, c.location_incoterms';
+		$sql .= ', i.libelle as label_incoterms';
+		$sql .= " FROM ".MAIN_DB_PREFIX."commande_fournisseur as c";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_payment_term as cr ON c.fk_cond_reglement = cr.rowid";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_paiement as p ON c.fk_mode_reglement = p.id";
+		$sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_input_method as cm ON cm.rowid = c.fk_input_method";
+		$sql .= ' LEFT JOIN '.MAIN_DB_PREFIX.'c_incoterms as i ON c.fk_incoterms = i.rowid';
+		$sql .= " WHERE c.fk_soc=".((int) $id);
+		$sql .= " AND c.fk_statut IN (".implode(',',$status).")";
+
+		dol_syslog(get_class($this)."::fetch", LOG_DEBUG);
+		$resql = $this->db->query($sql);
+		$num = $this->db->num_rows($resql);
+		$i = 0;
+		$arrayResult = array();
+		if ($resql) {
+			while ($i<$num) {
+				$obj = $this->db->fetch_object($resql);
+
+				$cf = new self($this->db);
+				$cf->id=$obj->rowid;
+				$cf->entity=$obj->entity;
+
+				$cf->ref=$obj->ref;
+				$cf->ref_supplier=$obj->ref_supplier;
+				$cf->socid=$obj->fk_soc;
+				$cf->fourn_id=$obj->fk_soc;
+				$cf->statut=$obj->fk_statut;
+				$cf->status=$obj->fk_statut;
+				$cf->billed=$obj->billed;
+				$cf->user_author_id=$obj->fk_user_author;
+				$cf->user_valid_id=$obj->fk_user_valid;
+				$cf->user_approve_id=$obj->fk_user_approve;
+				$cf->user_approve_id2=$obj->fk_user_approve2;
+				$cf->total_ht=$obj->total_ht;
+				$cf->total_tva=$obj->total_tva;
+				$cf->total_localtax1=$obj->localtax1;
+				$cf->total_localtax2=$obj->localtax2;
+				$cf->total_ttc=$obj->total_ttc;
+				$cf->date_creation=$cf->db->jdate($obj->date_creation);
+				$cf->date_valid=$cf->db->jdate($obj->date_valid);
+				$cf->date_approve=$cf->db->jdate($obj->date_approve);
+				$cf->date_approve2=$cf->db->jdate($obj->date_approve2);
+				$cf->date_commande=$cf->db->jdate($obj->date_commande); // date we make the order to supplier
+				if (isset($obj->date_commande)) {
+					$cf->date=$cf->date_commande;
+				} else {
+					$cf->date=$cf->date_creation;
+				}
+				$cf->date_livraison=$cf->db->jdate($obj->delivery_date); // deprecated
+				$cf->delivery_date=$cf->db->jdate($obj->delivery_date);
+				$cf->remise_percent=$obj->remise_percent;
+				$cf->methode_commande_id=$obj->fk_input_method;
+				$cf->methode_commande=$obj->methode_commande;
+
+				$cf->source=$obj->source;
+				$cf->fk_project=$obj->fk_project;
+				$cf->cond_reglement_id=$obj->fk_cond_reglement;
+				$cf->cond_reglement_code=$obj->cond_reglement_code;
+				$cf->cond_reglement=$obj->cond_reglement_label;            // deprecated
+				$cf->cond_reglement_label=$obj->cond_reglement_label;
+				$cf->cond_reglement_doc=$obj->cond_reglement_doc;
+				$cf->fk_account=$obj->fk_account;
+				$cf->mode_reglement_id=$obj->fk_mode_reglement;
+				$cf->mode_reglement_code=$obj->mode_reglement_code;
+				$cf->mode_reglement=$obj->mode_reglement_libelle;
+				$cf->note=$obj->note_private; // deprecated
+				$cf->note_private=$obj->note_private;
+				$cf->note_public=$obj->note_public;
+				$cf->model_pdf=$obj->model_pdf;
+				$cf->modelpdf=$obj->model_pdf; // deprecated
+
+				//Incoterms
+				$cf->fk_incoterms=$obj->fk_incoterms;
+				$cf->location_incoterms=$obj->location_incoterms;
+				$cf->label_incoterms=$obj->label_incoterms;
+
+				// Multicurrency
+				$cf->fk_multicurrency=$obj->fk_multicurrency;
+				$cf->multicurrency_code=$obj->multicurrency_code;
+				$cf->multicurrency_tx=$obj->multicurrency_tx;
+				$cf->multicurrency_total_ht=$obj->multicurrency_total_ht;
+				$cf->multicurrency_total_tva=$obj->multicurrency_total_tva;
+				$cf->multicurrency_total_ttc=$obj->multicurrency_total_ttc;
+
+				$cf->extraparams=(array)json_decode($obj->extraparams, true);
+
+
+				// Retrieve all extrafield
+				// fetch optionals attributes and labels
+				$cf->fetch_optionals();
+
+				if ($cf->statut == 0) {
+					$cf->brouillon=1;
+				}
+
+				/*
+				 * Lines
+				 */
+				$result=$cf->fetch_lines();
+
+				$arrayResult[$cf->id]=$cf;
+				$i++;
+			}
+			$this->db->free($resql);
+
+			if (empty($arrayResult)) {
+				return -1;
+			} else {
+				return $arrayResult;
+			}
+		} else {
+			$this->error = $this->db->error()." sql=".$sql;
+			return 0;
+		}
+	}
 	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
 	/**
 	 * Load array lines
