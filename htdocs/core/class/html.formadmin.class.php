@@ -93,7 +93,7 @@ class FormAdmin
 
 		$out .= '<select '.($multiselect ? 'multiple="multiple" ' : '').'class="flat'.($morecss ? ' '.$morecss : '').'" id="'.$htmlname.'" name="'.$htmlname.($multiselect ? '[]' : '').'"'.($disabled ? ' disabled' : '').'>';
 		if ($showempty && !$multiselect) {
-			$out .= '<option value="0"';
+			$out .= '<option value=""';
 			if ($selected === '') {
 				$out .= ' selected';
 			}
