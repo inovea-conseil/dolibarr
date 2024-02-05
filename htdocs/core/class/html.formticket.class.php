@@ -330,7 +330,7 @@ class FormTicket
 		print '<tr><td><span class="fieldrequired"><label for="selectcategory_code">'.$langs->trans("TicketCategory").'</span></label></td><td>';
 		$filter = '';
 		if ($public) {
-			$filter = 'public=1';
+			$filter = 'public:=:1';
 		}
 		$selected = (GETPOST('category_code') ? GETPOST('category_code') : $this->category_code);
 		$this->selectGroupTickets($selected, 'category_code', $filter, 2, 1, 0, 0, 'minwidth200');
