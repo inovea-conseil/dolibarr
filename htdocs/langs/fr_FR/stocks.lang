@@ -332,3 +332,4 @@ ConfirmDeleteBatch=Voulez-vous vraiment supprimer le lot/série ?
 WarehouseUsage=Utilisation de entrepôt
 InternalWarehouse=Entrepôt interne
 ExternalWarehouse=Entrepôt externe
+MouvementStockAssociated = Mouvements de stocks
