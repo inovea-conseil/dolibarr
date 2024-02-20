@@ -105,7 +105,9 @@ if (isModEnabled('stocktransfer')) {
 	require_once DOL_DOCUMENT_ROOT.'/product/stock/stocktransfer/class/stocktransfer.class.php';
 	require_once DOL_DOCUMENT_ROOT.'/product/stock/stocktransfer/class/stocktransferline.class.php';
 }
-
+if (isModEnabled('stockmouvement')) {
+	require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
+}
 
 
 // Load translation files required by the page
@@ -617,8 +619,8 @@ $listofreferent = array(
 	'stock_mouvement'=>array(
 		'name'=>"MouvementStockAssociated",
 		'title'=>"ListMouvementStockProject",
-		'class'=>'StockTransfer',
-		'table'=>'stocktransfer_stocktransfer',
+		'class'=>'MouvementStock',
+		'table'=>'stock_mouvement', // correct table name , previously stocktransfer_stocktransfer
 		'datefieldname'=>'datem',
 		'margin'=>'minus',
 		'project_field'=>'fk_project',
@@ -750,7 +752,7 @@ if (!$showdatefilter) {
 
 // Show balance for whole project
 
-$langs->loadLangs(array("suppliers", "bills", "orders", "proposals", "margins"));
+$langs->loadLangs(array("suppliers", "bills", "orders", "proposals", "margins","stocks"));
 
 if (isModEnabled('stock')) {
 	$langs->load('stocks');
@@ -859,7 +861,10 @@ foreach ($listofreferent as $key => $value) {
 				if ($tablename != 'expensereport_det' && method_exists($element, 'fetch_thirdparty')) {
 					$element->fetch_thirdparty();
 				}
-
+				// Get stock mouvement labels
+				if ($tablename == 'stock_mouvement') {
+					$label[] = $element->label;
+				}
 				// Define $total_ht_by_line
 				if ($tablename == 'don' || $tablename == 'chargesociales' || $tablename == 'payment_various' || $tablename == 'salary') {
 					$total_ht_by_line = $element->amount;
@@ -1125,6 +1130,12 @@ foreach ($listofreferent as $key => $value) {
 		print '<td style="width: 24px"></td>';
 		// Ref
 		print '<td'.(($tablename != 'actioncomm' && $tablename != 'projet_task') ? ' style="width: 200px"' : '').'>'.$langs->trans("Ref").'</td>';
+		//Labels
+		if ($tablename == 'stock_mouvement') {
+			print '<td>';
+			print $langs->trans("Label");
+			print '</td>';
+		}
 		// Date
 		print '<td'.(($tablename != 'actioncomm' && $tablename != 'projet_task') ? ' style="width: 200px"' : '').' class="center">';
 		if (in_array($tablename, array('projet_task'))) {
@@ -1312,6 +1323,12 @@ foreach ($listofreferent as $key => $value) {
 				}
 				print "</td>\n";
 
+				//Labels
+				if ($tablename == 'stock_mouvement') {
+					print '<td>';
+					print $label[$i];
+					print '</td>';
+				}
 				// Date or TimeSpent
 				$date = '';
 				$total_time_by_line = null;
@@ -1573,7 +1590,10 @@ foreach ($listofreferent as $key => $value) {
 				if (in_array($tablename, array('projet_task'))) {
 					$colspan = 2;
 				}
-
+				//as labels were added, need to change colspan length
+				if (in_array($tablename, array('stock_mouvement'))) {
+					$colspan = 5;
+				}
 				print '<tr class="liste_total"><td colspan="'.$colspan.'">'.$langs->trans("Number").': '.$i.'</td>';
 				if (in_array($tablename, array('projet_task'))) {
 					print '<td class="center">';
@@ -1615,7 +1635,7 @@ foreach ($listofreferent as $key => $value) {
 			if (!is_array($elementarray)) {	// error
 				print '<tr><td>'.$elementarray.'</td></tr>';
 			} else {
-				$colspan = 7;
+				$colspan = 8;
 				if ($tablename == 'fichinter') {
 					$colspan++;
 				}
