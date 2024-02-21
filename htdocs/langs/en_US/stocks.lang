@@ -333,3 +333,5 @@ WarehouseUsage=Warehouse usage
 InternalWarehouse=Internal warehouse
 ExternalWarehouse=External warehouse
 MouvementStockAssociated = Associated stock mouvements
+TransferStockAssociated = Associated stock transfers
+ListTransferStockProject = List of stock transfers associated to project

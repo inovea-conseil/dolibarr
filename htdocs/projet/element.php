@@ -616,11 +616,11 @@ $listofreferent = array(
 		'testnew'=>$user->hasRight('project', 'creer'),
 		'test'=>isModEnabled('project') && $user->hasRight('projet', 'lire') && !getDolGlobalString('PROJECT_HIDE_TASKS')
 	),
-	'stock_mouvement'=>array(
-		'name'=>"MouvementStockAssociated",
-		'title'=>"ListMouvementStockProject",
-		'class'=>'MouvementStock',
-		'table'=>'stock_mouvement', // correct table name , previously stocktransfer_stocktransfer
+	isModEnabled('stocktransfer') ? 'stocktransfer_stocktransfer' : 'stock_mouvement'=>array(
+		'name'=>isModEnabled('stocktransfer') ?"TransferStockAssociated" :"MouvementStockAssociated",
+		'title'=>isModEnabled('stocktransfer') ? "ListTransferStockProject" : "ListMouvementStockProject",
+		'class'=>isModEnabled('stocktransfer') ? 'StockTransfer': 'MouvementStock',
+		'table'=>isModEnabled('stocktransfer') ?'stocktransfer_stocktransfer': 'stock_mouvement',
 		'datefieldname'=>'datem',
 		'margin'=>'minus',
 		'project_field'=>'fk_project',
