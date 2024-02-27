@@ -105,10 +105,6 @@ if (isModEnabled('stocktransfer')) {
 	require_once DOL_DOCUMENT_ROOT.'/product/stock/stocktransfer/class/stocktransfer.class.php';
 	require_once DOL_DOCUMENT_ROOT.'/product/stock/stocktransfer/class/stocktransferline.class.php';
 }
-if (isModEnabled('stockmouvement')) {
-	require_once DOL_DOCUMENT_ROOT.'/product/stock/class/mouvementstock.class.php';
-}
-
 
 // Load translation files required by the page
 $langs->loadLangs(array('projects', 'companies', 'suppliers', 'compta'));
