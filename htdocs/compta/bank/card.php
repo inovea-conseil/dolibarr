@@ -34,15 +34,13 @@
 require '../../main.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/bank.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/html.formaccounting.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formbank.class.php';
 require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 if (isModEnabled('category')) {
 	require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
-}
-if (isModEnabled('accounting')) {
-	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formaccounting.class.php';
 }
 if (isModEnabled('accounting')) {
 	require_once DOL_DOCUMENT_ROOT.'/accountancy/class/accountingaccount.class.php';
@@ -215,7 +213,7 @@ if (empty($reshook)) {
 			$id = $object->create($user);
 			if ($id > 0) {
 				// Category association
-				$categories = GETPOST('categories', 'array');
+				$categories = GETPOST('categories', 'array:int');
 				$object->setCategories($categories);
 
 				$action = '';
@@ -329,7 +327,7 @@ if (empty($reshook)) {
 			$result = $object->update($user);
 			if ($result >= 0) {
 				// Category association
-				$categories = GETPOST('categories', 'array');
+				$categories = GETPOST('categories', 'array:int');
 				$object->setCategories($categories);
 
 				$id = GETPOSTINT("id"); // Force load of this page
@@ -372,13 +370,12 @@ if (empty($reshook)) {
 $form = new Form($db);
 $formbank = new FormBank($db);
 $formcompany = new FormCompany($db);
-if (isModEnabled('accounting')) {
-	$formaccounting = new FormAccounting($db);
-}
+$formaccounting = new FormAccounting($db);
 
 $countrynotdefined = $langs->trans("ErrorSetACountryFirst").' ('.$langs->trans("SeeAbove").')';
 
 $help_url = 'EN:Module_Banks_and_Cash|FR:Module_Banques_et_Caisses|ES:Módulo_Bancos_y_Cajas|DE:Modul_Banken_und_Barbestände';
+$title = $langs->trans("BankAccount");
 if ($action == 'create') {
 	$title = $langs->trans("NewFinancialAccount");
 } elseif (!empty($object->ref)) {
@@ -703,7 +700,7 @@ if ($action == 'create') {
 		print '<table class="border centpercent tableforfield">';
 
 		// Type
-		print '<tr><td class="titlefield">'.$langs->trans("AccountType").'</td>';
+		print '<tr><td class="titlefieldmiddle">'.$langs->trans("AccountType").'</td>';
 		print '<td>'.$object->type_lib[$object->type].'</td></tr>';
 
 		// Currency
@@ -739,10 +736,13 @@ if ($action == 'create') {
 		print '<tr class="liste_titre_add"><td class="titlefield">'.$langs->trans("AccountancyCode").'</td>';
 		print '<td>';
 		if (isModEnabled('accounting')) {
-			$accountingaccount = new AccountingAccount($db);
-			$accountingaccount->fetch(0, $object->account_number, 1);
-
-			print $accountingaccount->getNomUrl(0, 1, 1, '', 1);
+			if (empty($object->account_number)) {
+				print img_warning($langs->trans("Mandatory"));
+			} else {
+				$accountingaccount = new AccountingAccount($db);
+				$accountingaccount->fetch(0, $object->account_number, 1);
+				print $accountingaccount->getNomUrl(0, 1, 1, '', 1);
+			}
 		} else {
 			print $object->account_number;
 		}
@@ -752,11 +752,11 @@ if ($action == 'create') {
 		if (isModEnabled('accounting')) {
 			print '<tr><td>'.$langs->trans("AccountancyJournal").'</td>';
 			print '<td>';
-
-			if ($object->fk_accountancy_journal > 0) {
+			if (empty($object->fk_accountancy_journal)) {
+				print img_warning($langs->trans("Mandatory"));
+			} elseif ($object->fk_accountancy_journal > 0) {
 				$accountingjournal = new AccountingJournal($db);
 				$accountingjournal->fetch($object->fk_accountancy_journal);
-
 				print $accountingjournal->getNomUrl(0, 1, 1, '', 1);
 			}
 			print '</td></tr>';
@@ -869,15 +869,15 @@ if ($action == 'create') {
 			print nl2br($object->owner_address);
 			print "</td></tr>\n";
 
-			print '<tr><td class="tdtop">'.$langs->trans("BankAccountOwnerZip").'</td>';
+			print '<tr><td>'.$langs->trans("BankAccountOwnerZip").'</td>';
 			print '<td>'.dol_escape_htmltag($object->owner_zip);
 			print '</td></tr>';
 
-			print '<tr><td class="tdtop">'.$langs->trans("BankAccountOwnerTown").'</td>';
+			print '<tr><td>'.$langs->trans("BankAccountOwnerTown").'</td>';
 			print '<td>'.dol_escape_htmltag($object->owner_town);
 			print '</td></tr>';
 
-			print '<tr><td class="tdtop">'.$langs->trans("BankAccountOwnerCountry").'</td>';
+			print '<tr><td>'.$langs->trans("BankAccountOwnerCountry").'</td>';
 			print '<td>';
 			$object->owner_country_code = dol_getIdFromCode($db, $object->owner_country_id, 'c_country', 'rowid', 'code');
 			$langs->load("dict");
@@ -899,14 +899,21 @@ if ($action == 'create') {
 		 * Action bar
 		 */
 		print '<div class="tabsAction">';
-
-		if ($user->hasRight('banque', 'configurer')) {
-			print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?action=edit&token='.newToken().'&id='.$object->id.'">'.$langs->trans("Modify").'</a>';
+		$parameters = array();
+		$reshook = $hookmanager->executeHooks('addMoreActionsButtons', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
+		if ($reshook < 0) {
+			setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
 		}
 
-		$canbedeleted = $object->can_be_deleted(); // Return true if account without movements
-		if ($user->hasRight('banque', 'configurer') && $canbedeleted) {
-			print '<a class="butActionDelete" href="'.$_SERVER["PHP_SELF"].'?action=delete&token='.newToken().'&id='.$object->id.'">'.$langs->trans("Delete").'</a>';
+		if (empty($reshook)) {
+			if ($user->hasRight('banque', 'configurer')) {
+				print '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?action=edit&token='.newToken().'&id='.$object->id.'">'.$langs->trans("Modify").'</a>';
+			}
+
+			$canbedeleted = $object->can_be_deleted(); // Return true if account without movements
+			if ($user->hasRight('banque', 'configurer') && $canbedeleted) {
+				print '<a class="butActionDelete" href="'.$_SERVER["PHP_SELF"].'?action=delete&token='.newToken().'&id='.$object->id.'">'.$langs->trans("Delete").'</a>';
+			}
 		}
 
 		print '</div>';

@@ -44,7 +44,7 @@ class modPropale extends DolibarrModules
 	 */
 	public function __construct($db)
 	{
-		global $conf, $user;
+		global $conf, $user, $hookmanager;
 
 		$this->db = $db;
 		$this->numero = 20;
@@ -71,7 +71,7 @@ class modPropale extends DolibarrModules
 		$this->conflictwith = array(); // List of module class names as string this module is in conflict with
 		$this->phpmin = array(7, 0); // Minimum version of PHP required by module
 		$this->config_page_url = array("propal.php");
-		$this->langfiles = array("propal", "bills", "companies", "deliveries", "products");
+		$this->langfiles = array("propal", "bills", "companies", "sendings", "products");
 
 		// Constants
 		$this->const = array();
@@ -111,6 +111,16 @@ class modPropale extends DolibarrModules
 		$this->const[$r][3] = "";
 		$this->const[$r][4] = 0;
 		$r++;
+
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
+		$this->const[$r][0] = "PROPOSAL_ONLINE_SIGNATURE_SECURITY_TOKEN";
+		$this->const[$r][1] = "chaine";
+		$this->const[$r][2] = getRandomPassword(true);
+		$this->const[$r][3] = "";
+		$this->const[$r][4] = 0;
+		$r++;
+
+
 
 		/*$this->const[$r][0] = "PROPALE_DRAFT_WATERMARK";
 		$this->const[$r][2] = "__(Draft)__";
@@ -306,6 +316,9 @@ class modPropale extends DolibarrModules
 		if (!empty($user) && !$user->hasRight('societe', 'client', 'voir')) {
 			$this->export_sql_end[$r] .= ' AND sc.fk_user = '.(empty($user) ? 0 : $user->id);
 		}
+		$parameters = array();
+		$hookmanager->executeHooks('printExportWhere', $parameters, $this); // Note that $action and $object may have been modified by hook
+		$this->export_sql_end[$r] .= $hookmanager->resPrint;
 
 		// Imports
 		//--------

@@ -66,6 +66,11 @@ class FormSetup
 	 */
 	public $htmlOutputMoreButton = '';
 
+	/**
+	 * Html string of button label
+	 * @var string
+	 */
+	public $htmlButtonLabel = 'Save';
 
 	/**
 	 * @var array<string,string>
@@ -139,11 +144,13 @@ class FormSetup
 	/**
 	 * Generate the form (in read or edit mode depending on $editMode)
 	 *
-	 * @param 	bool 	$editMode 	true will display output on edit mod
-	 * @param	bool	$hideTitle	True to hide the first title line
-	 * @return 	string				Html output
+	 * @param 	bool 	$editMode 		True will display output on edit mod
+	 * @param	bool	$hideTitle		True to hide the first title line
+	 * @param	string	$title			Title of first line
+	 * @param	string	$cssfirstcolumn	CSS first column
+	 * @return 	string					Html output
 	 */
-	public function generateOutput($editMode = false, $hideTitle = false)
+	public function generateOutput($editMode = false, $hideTitle = false, $title = '', $cssfirstcolumn = '')
 	{
 		global $hookmanager, $action;
 
@@ -165,6 +172,7 @@ class FormSetup
 
 			if ($editMode) {
 				$out .= '<form ' . self::generateAttributesStringFromArray($this->formAttributes) . ' >';
+				$out .= '<input type="hidden" name="page_y" value="">';
 
 				// generate hidden values from $this->formHiddenInputs
 				if (!empty($this->formHiddenInputs) && is_array($this->formHiddenInputs)) {
@@ -175,7 +183,7 @@ class FormSetup
 			}
 
 			// generate output table
-			$out .= $this->generateTableOutput($editMode, $hideTitle);
+			$out .= $this->generateTableOutput($editMode, $hideTitle, $title, $cssfirstcolumn);
 
 
 			$reshook = $hookmanager->executeHooks('formSetupBeforeGenerateOutputButton', $parameters, $this, $action); // Note that $action and $object may have been modified by some hooks
@@ -188,10 +196,14 @@ class FormSetup
 			} elseif ($editMode) {
 				$out .= '<div class="form-setup-button-container center">'; // Todo : remove .center by adding style to form-setup-button-container css class in all themes
 				$out .= $this->htmlOutputMoreButton;
-				$out .= '<input class="button button-save reposition" type="submit" value="' . $this->langs->trans("Save") . '">'; // Todo fix dolibarr style for <button and use <button instead of input
-				/*$out .= ' &nbsp;&nbsp; ';
-				$out .= '<a class="button button-cancel" type="submit" href="' . $this->formAttributes['action'] . '">'.$this->langs->trans('Cancel').'</a>';
-				*/
+				if ($editMode !== 3) {
+					$out .= '<input class="button button-save reposition" type="submit" value="' . $this->langs->trans($this->htmlButtonLabel ?: "Save") . '" name="save">'; // Todo fix dolibarr style for <button and use <button instead of input
+				}
+				if ($editMode === 2) {
+					// Add also a cancel button
+					$out .= ' &nbsp;&nbsp; ';
+					$out .= '<input class="button button-cancel" type="submit" value="' . $this->langs->trans('Cancel') . '" name="cancel">';
+				}
 				$out .= '</div>';
 			}
 
@@ -208,11 +220,13 @@ class FormSetup
 	/**
 	 * generateTableOutput
 	 *
-	 * @param 	bool 	$editMode 	True will display output on edit modECM
-	 * @param	bool	$hideTitle	True to hide the first title line
-	 * @return 	string				Html output
+	 * @param 	bool 	$editMode 		True will display output on edit modECM
+	 * @param	bool	$hideTitle		True to hide the first title line
+	 * @param	string	$title			Title of first line
+	 * @param	string	$cssfirstcolumn	CSS first column
+	 * @return 	string					Html output
 	 */
-	public function generateTableOutput($editMode = false, $hideTitle = false)
+	public function generateTableOutput($editMode = false, $hideTitle = false, $title = '', $cssfirstcolumn = '')
 	{
 		global $hookmanager, $action;
 		require_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
@@ -230,9 +244,12 @@ class FormSetup
 		} else {
 			$out = '<table class="noborder centpercent">';
 			if (empty($hideTitle)) {
+				if (empty($title)) {
+					$title = $this->langs->transnoentitiesnoconv("Parameter");
+				}
 				$out .= '<thead>';
 				$out .= '<tr class="liste_titre">';
-				$out .= '	<td>' . $this->langs->trans("Parameter") . '</td>';
+				$out .= '	<td'.($cssfirstcolumn ? ' class="'.$cssfirstcolumn.'"' : '').'>' . dolPrintHTML($title) . '</td>';
 				$out .= '	<td></td>';
 				$out .= '</tr>';
 				$out .= '</thead>';
@@ -401,9 +418,9 @@ class FormSetup
 		 */
 
 		$item = new FormSetupItem($confKey);
-		// need to be ignored from scrutinizer setTypeFromTypeString was created as deprecated to incite developer to use object oriented usage
-		// @phan-suppress-next-line PhanDeprecatedFunction
-		/** @scrutinizer ignore-deprecated */ $item->setTypeFromTypeString((string) $params['type']);
+		// setTypeFromTypeString was created as deprecated to incite developer to use object oriented usage
+		/** @phan-suppress-next-line PhanDeprecatedFunction */
+		$item->setTypeFromTypeString((string) $params['type']);
 
 		if (!empty($params['enabled']) && is_numeric($params['enabled'])) {
 			$item->enabled = (int) $params['enabled'];
@@ -899,6 +916,8 @@ class FormSetupItem
 			$out .= $this->generateInputFieldMultiSelect();
 		} elseif ($this->type == 'select') {
 			$out .= $this->generateInputFieldSelect();
+		} elseif ($this->type == 'radio') {
+			$out .= $this->generateInputFieldRadio();
 		} elseif ($this->type == 'selectUser') {
 			$out .= $this->generateInputFieldSelectUser();
 		} elseif ($this->type == 'textarea') {
@@ -910,10 +929,11 @@ class FormSetupItem
 		} elseif ($this->type == 'yesno') {
 			if (!empty($conf->use_javascript_ajax)) {
 				$input = $this->fieldParams['input'] ?? array();
-				$revertonoff = !empty($this->fieldParams['revertonoff']) ? 1 : 0;
-				$forcereload = !empty($this->fieldParams['forcereload']) ? 1 : 0;
+				$revertonoff = empty($this->fieldParams['revertonoff']) ? 0 : 1;
+				$forcereload = empty($this->fieldParams['forcereload']) ? 0 : 1;
+				$suffixarray = array('ifoff' => empty($this->fieldParams['alertifoff']) ? '' : '_red', 'ifon' => empty($this->fieldParams['alertifon']) ? '' : '_red');
 
-				$out .= ajax_constantonoff($this->confKey, $input, $this->entity, $revertonoff, 0, $forcereload, 2, 0, 0, '', '', $this->cssClass);
+				$out .= ajax_constantonoff($this->confKey, $input, $this->entity, $revertonoff, 0, $forcereload, 2, 0, 0, $suffixarray, '', $this->cssClass);
 			} else {
 				$out .= $this->form->selectyesno($this->confKey, $this->fieldValue, 1, false, 0, 0, $this->cssClass);
 			}
@@ -930,6 +950,7 @@ class FormSetupItem
 		} elseif ($this->type == 'product') {
 			if (isModEnabled("product") || isModEnabled("service")) {
 				$selected = (empty($this->fieldValue) ? '' : $this->fieldValue);
+				$out .= img_picto('', 'product', 'class="pictofixedwidth"');
 				$out .= $this->form->select_produits((int) $selected, $this->confKey, '', 0, 0, 1, 2, '', 0, array(), 0, '1', 0, $this->cssClass, 0, '', null, 1);
 			}
 		} elseif ($this->type == 'selectBankAccount') {
@@ -940,7 +961,13 @@ class FormSetupItem
 		} elseif ($this->type == 'password') {
 			$out .= $this->generateInputFieldPassword('dolibarr');
 		} elseif ($this->type == 'genericpassword') {
-			$out .= $this->generateInputFieldPassword('generic');
+			$out .= $this->generateInputFieldPassword('generic', 0, 0);
+		} elseif ($this->type == 'price') {
+			$out .= $this->generateInputFieldPrice();
+		} elseif ($this->type == 'email') {
+			$out .= $this->generateInputFieldEmail();
+		} elseif ($this->type == 'url') {
+			$out .= $this->generateInputFieldUrl();
 		} else {
 			$out .= $this->generateInputFieldText();
 		}
@@ -959,6 +986,48 @@ class FormSetupItem
 			$this->fieldAttr['class'] = 'flat '.(empty($this->cssClass) ? 'minwidth200' : $this->cssClass);
 		}
 		return '<input '.FormSetup::generateAttributesStringFromArray($this->fieldAttr).' />';
+	}
+
+	/**
+	 * Generate default input field
+	 *
+	 * @return string
+	 */
+	public function generateInputFieldPrice()
+	{
+		global $langs, $mysoc;
+
+		if (empty($this->fieldAttr) || empty($this->fieldAttr['class'])) {
+			$this->fieldAttr['class'] = 'flat '.(empty($this->cssClass) ? 'minwidth40 maxwidth75' : $this->cssClass);
+		}
+		//return img_picto('', 'currency', 'class="pictofixedwidth"').'<input '.FormSetup::generateAttributesStringFromArray($this->fieldAttr).' /> '.$langs->getCurrencySymbol($mysoc->currency_code);
+		return '<input '.FormSetup::generateAttributesStringFromArray($this->fieldAttr).' /> '.$langs->getCurrencySymbol($mysoc->currency_code);
+	}
+
+	/**
+	 * Generate default input field
+	 *
+	 * @return string
+	 */
+	public function generateInputFieldEmail()
+	{
+		if (empty($this->fieldAttr) || empty($this->fieldAttr['class'])) {
+			$this->fieldAttr['class'] = 'flat '.(empty($this->cssClass) ? 'minwidth100 maxwidth500' : $this->cssClass);
+		}
+		return img_picto('', 'email', 'class="pictofixedwidth"').'<input '.FormSetup::generateAttributesStringFromArray($this->fieldAttr).' />';
+	}
+
+	/**
+	 * Generate default input field
+	 *
+	 * @return string
+	 */
+	public function generateInputFieldUrl()
+	{
+		if (empty($this->fieldAttr) || empty($this->fieldAttr['class'])) {
+			$this->fieldAttr['class'] = 'flat '.(empty($this->cssClass) ? 'minwidth100 maxwidth500' : $this->cssClass);
+		}
+		return img_picto('', 'url', 'class="pictofixedwidth"').'<input '.FormSetup::generateAttributesStringFromArray($this->fieldAttr).' />';
 	}
 
 	/**
@@ -1067,16 +1136,17 @@ class FormSetupItem
 	/**
 	 * generate input field for a password
 	 *
-	 * @param   string  $type  'dolibarr' (dolibarr password rules apply) or 'generic'
-	 *
+	 * @param   string  $type  			'dolibarr' (dolibarr password rules apply) or 'generic'
+	 * @param	int		$defaultmin		Min nb of chars
+	 * @param	int		$defaultmax		Max nb of chars
 	 * @return  string
 	 */
-	public function generateInputFieldPassword($type = 'generic')
+	public function generateInputFieldPassword($type = 'generic', $defaultmin = 6, $defaultmax = 50)
 	{
 		global $conf, $langs, $user;
 
-		$min = 6;
-		$max = 50;
+		$min = $defaultmin;
+		$max = $defaultmax;
 		if ($type == 'dolibarr') {
 			$gen = getDolGlobalString('USER_PASSWORD_GENERATED', 'standard');
 			if ($gen == 'none') {
@@ -1097,6 +1167,9 @@ class FormSetupItem
 			$out .= ' maxlength="' . $max . '"';
 		}
 		$out .= '>';
+
+		$out .= '<span class="fa fa-eye paddingleft paddingright" onclick="javascript: console.log(\'click on show-hide pass\'); newtype = (jQuery(\'#'.trim($this->confKey).'\').attr(\'type\') == \'text\' ? \'password\' : \'text\'); jQuery(\'#'.trim($this->confKey).'\').attr(\'type\', newtype);"></span>';
+
 		return $out;
 	}
 
@@ -1117,7 +1190,6 @@ class FormSetupItem
 		return $this->form->multiselectarray($this->confKey, $this->fieldOptions, $TSelected, 0, 0, '', 0, 0, 'style="min-width:100px"');
 	}
 
-
 	/**
 	 * generateInputFieldSelect
 	 *
@@ -1131,6 +1203,23 @@ class FormSetupItem
 		}
 
 		$s .= $this->form->selectarray($this->confKey, $this->fieldOptions, $this->fieldValue, 0, 0, 0, '', 0, 0, 0, '', $this->cssClass);
+
+		return $s;
+	}
+
+	/**
+	 * generateInputFieldSelect
+	 *
+	 * @return string
+	 */
+	public function generateInputFieldRadio()
+	{
+		$s = '';
+		if ($this->picto) {
+			$s .= img_picto('', $this->picto, 'class="pictofixedwidth"');
+		}
+
+		$s .= $this->form->radio($this->confKey, $this->fieldOptions, $this->fieldValue, ['attrLabel' => ['class' => $this->cssClass]]);
 
 		return $s;
 	}
@@ -1257,7 +1346,7 @@ class FormSetupItem
 			if ($result < 0) {
 				$this->setErrors($c->errors);
 			}
-			$ways = $c->print_all_ways(' &gt;&gt; ', 'none', 0, 1); // $ways[0] = "ccc2 >> ccc2a >> ccc2a1" with html formatted text
+			$ways = $c->print_all_ways('auto', 'none', 0, 1); // $ways[0] = "ccc2 >> ccc2a >> ccc2a1" with html formatted text
 			$toprint = array();
 			foreach ($ways as $way) {
 				$toprint[] = '<li class="select2-search-choice-dolibarr noborderoncategories"' . ($c->color ? ' style="background: #' . $c->color . ';"' : ' style="background: #bbb"') . '>' . $way . '</li>';
@@ -1449,6 +1538,17 @@ class FormSetupItem
 	}
 
 	/**
+	 * Set type of input as string
+	 *
+	 * @return self
+	 */
+	public function setAsUrl()
+	{
+		$this->type = 'url';
+		return $this;
+	}
+
+	/**
 	 * Set type of input as color
 	 *
 	 * @return self
@@ -1538,6 +1638,17 @@ class FormSetupItem
 	}
 
 	/**
+	 * Set type of input as product
+	 *
+	 * @return self
+	 */
+	public function setAsPrice()
+	{
+		$this->type = 'price';
+		return $this;
+	}
+
+	/**
 	 * Set type of input as a category selector
 	 * TODO add default value
 	 *
@@ -1563,7 +1674,7 @@ class FormSetupItem
 
 
 	/**
-	 * Set type of input as a simple title. No data to store
+	 * Set type of input as a multiselect list.
 	 *
 	 * @param array<string,string|array{id:string,label:string,color:string,picto:string,labelhtml:string}> $fieldOptions A table of field options
 	 * @return self
@@ -1579,7 +1690,7 @@ class FormSetupItem
 	}
 
 	/**
-	 * Set type of input as a simple title. No data to store
+	 * Set type of input as a select list.
 	 *
 	 * @param ?array<string,string|array{id:string,label:string,color:string,picto:string,labelhtml:string}>  $fieldOptions  A table of field options
 	 * @return self
@@ -1594,8 +1705,25 @@ class FormSetupItem
 		return $this;
 	}
 
+
 	/**
-	 * Set type of input as a simple title. No data to store
+	 * Set type of input as a radio button.
+	 *
+	 * @param  ?array<string,string|array{id:string,label:string,picto?:string,labelIsHtml?:bool}> $fieldOptions  A table of field options
+	 * @return self
+	 */
+	public function setAsRadio($fieldOptions)
+	{
+		if (is_array($fieldOptions)) {
+			$this->fieldOptions = $fieldOptions;
+		}
+
+		$this->type = 'radio';
+		return $this;
+	}
+
+	/**
+	 * Set type of input as a selection of a user from dolibarr users list
 	 *
 	 * @return self
 	 */
@@ -1606,7 +1734,7 @@ class FormSetupItem
 	}
 
 	/**
-	 * Set type of input as a simple title. No data to store
+	 * Set type of input as a bank account selection from dolibarr bank accounts list
 	 *
 	 * @return self
 	 */
@@ -1621,6 +1749,7 @@ class FormSetupItem
 	 * Hide entry on display.
 	 *
 	 * @return self
+	 * @see setAsGenericPassword()
 	 */
 	public function setAsPassword()
 	{
@@ -1633,6 +1762,7 @@ class FormSetupItem
 	 * Hide entry on display.
 	 *
 	 * @return self
+	 * @see setAsPassword()
 	 */
 	public function setAsGenericPassword()
 	{

@@ -355,6 +355,7 @@ class Translate
 				if (!$found) {
 					if ($fp = @fopen($file_lang, "rt")) {
 						// $tabtranslatedomain = array(); // To save lang content in cache when enabled (commented because initial = argument to function)
+						//print "Process file_lang=$file_lang\n";
 
 						/**
 						 * Read each lines until a '=' (with any combination of spaces around it)
@@ -673,7 +674,7 @@ class Translate
 				$tmparray = explode(';', getDolGlobalString($replacekey));
 				foreach ($tmparray as $tmp) {
 					$tmparray2 = explode(':', $tmp);
-					$str = preg_replace('/' . preg_quote($tmparray2[0]) . '/', $tmparray2[1], $str);
+					$str = preg_replace('/' . preg_quote($tmparray2[0], '/') . '/', $tmparray2[1], $str);
 				}
 			}
 
@@ -691,7 +692,6 @@ class Translate
 			}
 
 			$str = str_replace('__percent_with_bad_specifier__', '%', $str);
-
 
 			// We replace some HTML tags by __xx__ to avoid having them encoded by htmlentities because
 			// we want to keep '"' '<b>' '</b>' '<u>' '</u>' '<i>' '</i>' '<center> '</center>' '<strong' '</strong>' '<a ' '</a>' '<br>' '<span' '</span>' '< ' that are reliable HTML tags inside translation strings.
@@ -792,7 +792,7 @@ class Translate
 				$tmparray = explode(';', getDolGlobalString($replacekey));
 				foreach ($tmparray as $tmp) {
 					$tmparray2 = explode(':', $tmp);
-					$str = preg_replace('/' . preg_quote($tmparray2[0]) . '/', $tmparray2[1], $str);
+					$str = preg_replace('/' . preg_quote($tmparray2[0], '/') . '/', $tmparray2[1], $str);
 				}
 			}
 
@@ -824,9 +824,9 @@ class Translate
 	/**
 	 *  Return translation of a key depending on country
 	 *
-	 *  @param	string	$str            string root to translate
-	 *  @param  string	$countrycode    country code (FR, ...)
-	 *  @return	string         			translated string
+	 *  @param	string	$str            String root to translate. Example 'TotalHT', 'AmountLT1', 'ProfId1', 'ProfId2', 'LocalTax1IsUsedExample', ...
+	 *  @param  string	$countrycode    Country code (FR, ...)
+	 *  @return	string         			Translated string
 	 *  @see transcountrynoentities(), picto_from_langcode()
 	 */
 	public function transcountry($str, $countrycode)
@@ -1137,8 +1137,7 @@ class Translate
 		$currency_sign = ''; // By default return iso code
 
 		if (empty($currency_code)) {
-			global $conf;
-			$currency_code = (string) $conf->currency;
+			$currency_code = getDolCurrency();
 		}
 
 		if (function_exists("mb_convert_encoding")) {
@@ -1196,7 +1195,13 @@ class Translate
 				$obj = $db->fetch_object($resql);
 				if ($obj) {
 					// If a translation exists, we use it lese we use the default label
-					$this->cache_currencies[$obj->code_iso]['label'] = ($obj->code_iso && $this->trans("Currency" . $obj->code_iso) != "Currency" . $obj->code_iso ? $this->trans("Currency" . $obj->code_iso) : ($obj->label != '-' ? $obj->label : ''));
+					if ($obj->code_iso && !empty($this->tab_translate["Currency" . $obj->code_iso])) {	// Test on tab_translate is faster (possible because we knowhere the "dict" language file has been previously loaded).
+						$tmplabel = $this->trans("Currency" . $obj->code_iso);
+					} else {
+						$tmplabel = ($obj->label != '-' ? $obj->label : '');
+					}
+
+					$this->cache_currencies[$obj->code_iso]['label'] = $tmplabel;
 					$this->cache_currencies[$obj->code_iso]['unicode'] = (array) json_decode((empty($obj->unicode) ? '' : $obj->unicode), true);  // @phan-suppress-current-line PhanTypeMismatchProperty
 					$label[$obj->code_iso] = $this->cache_currencies[$obj->code_iso]['label'];
 				}

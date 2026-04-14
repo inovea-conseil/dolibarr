@@ -36,7 +36,7 @@ create table llx_commande
   date_valid				datetime,						-- date de validation
   date_cloture				datetime,						-- date de cloture
   date_commande				date,							-- date de la commande
-  fk_user_author			integer,						-- user making creation
+  fk_user_author			integer,						-- user making creation, may be null if created by automated process
   fk_user_modif				integer,						-- user making last change
   fk_user_valid				integer,						-- user validating
   fk_user_cloture			integer,						-- user closing
@@ -86,5 +86,8 @@ create table llx_commande
   multicurrency_tx			double(24,8) DEFAULT 1,
   multicurrency_total_ht	double(24,8) DEFAULT 0,
   multicurrency_total_tva	double(24,8) DEFAULT 0,
-  multicurrency_total_ttc	double(24,8) DEFAULT 0
+  multicurrency_total_ttc	double(24,8) DEFAULT 0,
+
+  ip 						varchar(250),
+  user_agent				varchar(255)
 )ENGINE=innodb;
